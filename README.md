@@ -1,1 +1,1 @@
-# Daca-project
+The purpose of the project is to conduct an empirical study using tools like: Linear regression, hypothesis testing, dummy variables, and more. to try and find the effect of the availability and design of a constitutional policy (in this case the DACA project), affects investment in human capital among young people (young adults try getting better grades in persuit of a better life).
