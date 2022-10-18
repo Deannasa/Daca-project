@@ -1,0 +1,226 @@
+---
+title: "DACA Project"
+output:
+  pdf_document: default
+  html_document: default
+date: '2022-10-06'
+---
+The purpose of the project is to conduct an empirical study using tools like: Linear regression, hypothesis testing, dummy variables, and more. to try and find the effect of the availability and design of a constitutional policy (in this case the DACA project), affects investment in human capital among young people (young adults try getting better grades in persuit of a better life).
+
+this project conducted on "DACA" data - In 2012, the DACA program began in the United States. This program granted temporary legal status to young immigrants. The ones, who met the eligibility conditions, received a temporary work permit and delay in their deportation. this database containing a representative sample of Hispanic immigrants living in USA Between the years 2005 to 2015.
+
+### Setup
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(lmtest)
+library(sandwich)
+daca <- read.csv("C:/datas/DACAdata.csv", header=TRUE)
+```
+
+The comparison group - US citizens who were born in countries outside the US and immigrated as children before the age of 10 until the year 2007. 
+The treated group - Hispanic children who immigrated to the US before the age of 10 until the year 2007 without citizenship and are eligible for DACA.
+
+```{r}
+newdaca <- daca %>% filter(yrimmig<= 2007 & ageimmig <=10)
+```
+
+Linear modeling hs with our 5 variables :fem(1 if female), age, singlemom(1 if single mom), married(1 if married), nsibs(number of siblings)
+
+The motivation behind choosing these variables is that each of the above five variables are not variables that are unique to one of the groups. Both of the above groups can "maintain these variables". That is, even in the comparison group there can be single mothers, married observations.
+We would like to check if there is a significant difference in one of the non-unique variables between the groups, thereby confirming our assumption that the two groups in the period preceding the program are similar in their characteristics, except for the fact of legality. For the purpose of testing the above hypotheses, we ran 5 different regressions. In each run, the variable we are interested in functioned as the explained variable, while the noncit variable (which differentiates between the comparison group and the treatment group) functioned as the explanatory variable. The reason for this is that here we are actually testing the hypotheses the following –
+H_1:β_i≠0 H_0:β_i=0   
+where β_i represents the corresponding noncit coefficient for the i'th variable. Thus, using a two-sided t-test, if we reject the null hypothesis, we will actually accept that β_i is the significant difference between the comparison group and the control group. In particular, the standard deviation of β_i is the standard deviation of the coefficient difference between the groups.
+```{r}
+newdaca_beforedaca <- newdaca %>% filter(year < 2012)
+sum(newdaca_beforedaca$noncit)
+nrow(newdaca_beforedaca) - sum(newdaca_beforedaca$noncit)
+```
+
+Fem coefficient test
+```{r}
+femlm <- lm(fem ~ noncit , data = newdaca_beforedaca)
+summary(femlm)
+```
+Age coefficient test
+```{r}
+agelm <- lm(age ~ noncit , data = newdaca_beforedaca)
+summary(agelm)
+```
+Singlemom coefficient test
+```{r}
+singmomlm <- lm(singlemom ~ noncit , data = newdaca_beforedaca)
+summary(singmomlm)
+```
+Married coefficient test
+```{r}
+marriedlm <- lm(married ~ noncit , data = newdaca_beforedaca)
+summary(marriedlm)
+```
+Nsibs coeffitient test
+```{r}
+nsibslm <- lm(nsibs ~ noncit , data = newdaca_beforedaca)
+summary(nsibslm)
+```
+
+```{r}
+lm4 <- lm(hs ~ fem + age + singlemom + married + nsibs + noncit,data = newdaca_beforedaca)
+summary(lm4)
+```
+The coefficients of the variables are all significant at a 95% significance level with the exception of nsibs, represent to us the change in the probability of graduating high school, each in its own way:
+
+Fem - given that the observation is a woman, her chance of finishing high school is 4.1 percentage points greater than a non-female observation (male...)
+
+Age - Every additional year in age increases the chance of the observation to finish high school by 12.8 percentage points.
+
+singlemom=1 - her chance of finishing high school is 2.08 percentage points smaller than an observation whose  singlemom=0.
+
+married=0 - the chance that the observation will graduate high school is 7.2 percentage points smaller than an observation who is not married.
+
+nsibs - Each additional brother/sister increases the chance that the same observation will finish high school by 0.34 percentage points.
+
+noncit - her chance of finishing high school is 7.6 percentage points smaller than the observation with citizenship.
+
+Therefore, a causal interpretation can be attributed to the noncit variable about the effect of being stateless on the chance of graduating from high school, and this is because the coefficient of the noncit variable is statistically significant. Therefore, we will conclude that there is a causal relationship between the individual's chance of finishing high school, and whether the indicator is whether that individual has citizenship or not.
+
+```{r}
+
+daca1418nocit<- subset(daca, daca$age>=14& daca$age<=18& daca$noncit==0)
+##14 - 18 comparison group data
+
+daca1418cit<- subset(daca, daca$age>=14& daca$age<=18 & daca$noncit==1)
+##14 - 18 treatment group data
+
+comparison<- aggregate(daca1418nocit$inschool, by= list(daca1418nocit$year), FUN= mean) ## comparison group
+
+treatment<- aggregate(daca1418cit$inschool, by= list(daca1418cit$year), FUN= mean) ## treatment group
+```
+
+```{r}
+daca1922nocit<- subset(daca, daca$age>=19& daca$age<=22& daca$noncit==0)
+##19 - 22 comparison group data
+
+daca1922cit<- subset(daca, daca$age>=19& daca$age<=22 & daca$noncit==1)
+##19 - 22 treatment group data
+
+comparison<- aggregate(daca1922nocit$inschool, by= list(daca1922nocit$year), FUN= mean) ## comparison group
+
+treatment<- aggregate(daca1922cit$inschool, by= list(daca1922cit$year), FUN= mean) ## treatment group
+
+```
+
+The plots for high school participation over the years:
+
+```{r}
+plot(x=comparison$Group.1,y=(comparison$x), col = "darkblue", pch=18, main ="School Attendance, ages 14-18" , xlab = "Year", ylab = "School Attendance %", ylim = c(0.7,1))
+points(treatment$x~comparison$Group.1, col = "red", pch=18)
+legend(x="topleft",legend =c("Comparison Group","Treatment group"),col =c("darkblue","red"),lty =c(1,1))
+abline(v=2012,col="black",lty="dotted")
+```
+
+```{r}
+plot(x=comparison$Group.1,y=(comparison$x), col = "darkblue", pch=18, main ="School Attendance, ages 19-22" , xlab = "Year", ylab = "School Attendance %", ylim = c(0.1,0.65))
+points(treatment$x~comparison$Group.1, col = "red", pch=18)
+legend(x="topleft",legend =c("Comparison Group","Treatment group"),col =c("darkblue","red"),lty =c(1,1))
+abline(v=2012,col="black",lty="dotted")
+```
+
+The goal is to see if in the absence of the treatment,the difference would have remained constant over time. And in our context - the treatment, is the DACA program. This means that we have to check if without the DACA program, the gaps between the two groups, in the various tested parameters, remain constant today.
+
+by looking at the two plots from above and note that the gaps between the treatment group and the comparison group were more or less the same until 2012. Starting in 2012, We are witnessing reduction of the gaps, both in the ages 14-18 and in the ages 19-22 (although, in the ages 14-18 we are witnessing a higher reduction).
+
+Moreover, in a previous analysis of the plots, we tested the effect of the five (seemingly arbitrary) parameters on the chance of graduating high school among the pre-DACA population. After that, we accepted that there are differences for these five parameters between the groups, in a distinct way. Admittedly, this does not mean that the parameters are different in the two groups over time, but it definitely confirms our hypothesis, that there are gaps between the two groups.
+
+In order to confirm our interpretation that there is a causal relationship between the DACA program, we would try to ensure that our estimator for the causal relationship (the corresponding coefficient) was not biased, and in particular significant.
+Therefore, we would use helping variables, which would be responsible for explaining the variance that is not explained by the relevant variable. Another way we would operate, is to use control variables. Since the tests we perform are carried out over time, we would like to try to "catch" these changes, so that they do not affect the quality of our model's estimation. Therefore, using control variables, which depend on time and the type of group, will help us explain some of the differences between the groups.
+
+```{r}
+daca1922 <- newdaca %>% filter(age %in% c(19,22))
+
+TreatedBefore <- mean(daca1922$hs[daca1922$elig==1 & daca1922$year < 2012])
+TreatedAfter <- mean(daca1922$hs[daca1922$elig==1 & daca1922$year >= 2012])
+ComparisonBefore <- mean(daca1922$hs[daca1922$elig==0 & daca1922$year < 2012])
+ComparisonAfter <-mean(daca1922$hs[daca1922$elig==0 & daca1922$year >= 2012])
+
+TreatedBefore
+TreatedAfter
+ComparisonBefore
+ComparisonAfter
+
+TreatedAfter - TreatedBefore
+ComparisonAfter - ComparisonBefore
+
+0.07798241 - 0.03038674
+
+ComparisonAfter - TreatedAfter
+ComparisonBefore - TreatedBefore
+
+lm11 <- lm(hs ~ elig*post , data = daca1922)
+summary(lm11)
+```
+
+My model:
+
+hs = β_0 + β_1*elig + β_2*post + β_3*(elig*post) + u
+
+Intercept, β_0 (0.846190) – "is the base level". That is, those who are not in the treatment group and also before the "treatment" period (DACA). We will note that this coefficient is early, and also according to which the chance of an observation who meets these requirements to graduate from high school is 84%.
+For convenience, we will call this type of observation from now on a base observation.
+
+elig, β_1 (-0.143348) – the above coefficient indicates the difference between an observation that is in the treatment group but in the period before the "treatment" (DACA) and a baseline observation. We note that this coefficient is also significant, and that it indicates that an observation who meets these requirements, is expected to graduate from high school with a chance that is 14 percentage points lower than the base observation.
+
+post, β_2 (0.030387) - indicates the difference between an observation that is not in the treatment group, but is in the period after the "treatment", and a baseline observation. also β_2 significant. An observation that meets these requirements, will improve her chances of completing high school by 3 percentage points, compared to the baseline observation.
+
+elig*post, β_3 (0.047596) – the "main coefficient" that interests us. this coefficient indicates the difference, between an observation that is in the treatment group and in the period after the "treatment", and a baseline observation. This coefficient is significant. An observation that meets these requirements, will judge its chances of completing high school by 4 percentage points, compared to a baseline observation.
+
+
+We are intrested to see if  homoscedasticity exist, we tested this assumption by performing the BP test, and rejected the null hypothesis that homoscedasticity exists. The consequences of the fact that homoscedasticity does not exist, is that in fact we cannot assume that the estimators we received in the model are efficient estimators. After the correction (white), we received estimators with identical values (not surprising - the estimators are still unbiased and consistent), but with lower standard deviations.
+
+
+```{r}
+bptest(lm11)
+lm12.1 <- coeftest(lm11, vcov = vcovHC(lm11,type = "HC1"))
+lm12.1
+```
+Now we will add the following new variables, and justify them:
+
+English=1  (English as a native language) - English as a native language can indicate a higher socio-economic status, since it can be concluded that the family has an American connection, and from this we can conclude that his social status at school will be better than one whose native language is not English. It can be assumed that an individual who gets along socially at school will be less likely to want to drop out of high school than someone who doesn't.
+
+In addition to this, there is a high probability that an individual fluent in english will do better in tests (both written and oral). Therefore, he will not experience poor motivation, and there is a higher chance that he will receive higher positive feedbacks than an individual who does not speak English as a native language.
+
+Inpov=1 (is the mother below the poverty line) - it is likely that an individual who is below the poverty line will have to help his family in terms of maintaining the house.
+From this, we can conclude that either the individual will not have the time, the desire and the motivation to succeed in studies, and hence there is a higher chance than one who is not below the poverty line, that he will drop out of high school.
+In addition, it is possible that an individual below the poverty line will not be able to finance adequate means for learning (writing tools, books, etc.), and therefore faces poorer means to succeed in studies. Lack of success may lead to lack of desire, and hence to retirement.
+
+My model now:
+
+hs = β_0 + β_1*elig + β_2*post + β_3*(elig*post) +β_4 *inpov + β_5*english + u
+
+```{r}
+lm15 <- lm(hs ~ elig*post + inpov + english , data = daca1922)
+
+anova(lm11,lm15)
+
+bptest(lm15)
+lm15.1 <- coeftest(lm15, vcov = vcovHC(lm15,type = "HC1"))
+summary(lm15)
+lm15.1
+
+qf(0.95,6,19296)
+```
+My F test:
+
+H_0:β_4=β_5=0
+H_1:else
+
+Here are the test results:
+F_stat= 120.31>2.09= F_(crit(6,19296,1-α=0.95))
+we rejected the null hypothesis, adding these two variables do contribute to explaining the model. After adding the variables, with the help of the BP test we checked for homoscedasticity and after finding that it does not hold, we performed the WHITE regulation.
+We received from the F test, that the variables we added contribute to the model. This means that the new variables we added manage to explain and give more information about an individual's chance of finishing high school. since we were now able to add explanatory variables to the model, part of the unexplained variance was "captured" by these variables, therefore the standard deviations of the estimators decreased.
+
+The main assumption that stands before our eyes in building the model, which tries to establish a causal relationship, is that the expectation of the variables given the residuals is zero. As mentioned, in the initial basic model we built, there was a variation that we could not explain. After adding the variables, we added all the remaining explanatory variables, in order to fulfill this assumption. After we maintain this assumption, and have performed the variance correction, we are in a model that can now assume causality, and in particular the parameter we are interested in is the interaction parameter, which tells us whether DACA does have an impact.
+
+
+To conclude, we see from the study that The policy increased school attendance and high school graduation rates, an effect that was more pronounced among Hispanic men. These effects imply that DACA reduced the citizen-noncitizen gap in school attendance and the gap in high school completion. 
+These results have significant policy implications. First, they show that a substantial part of the gap in educational attainment between noncitizen and citizen
+youth is due to the low benefits of schooling associated with lack of legal status.
+Hence, policies that increase the real or perceived economic opportunities of disadvantaged youth may lead to a more educated workforce. 
